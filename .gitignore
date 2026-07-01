@@ -4,3 +4,4 @@ debug_screenshot.png
 __pycache__/
 *.pyc
 .env
+test_db.py
