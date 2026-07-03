@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 PRICE_SELECTORS = [
     "div.v1zwn21l.v1zwn20._1psv1zeb9._1psv1ze0",  # confirmed working (Day 1)
     "div._30jeq3",                                   # older template fallback
-    "div.Nx9bqj",                                    # another known variant
+    "div.Nx9bqj", 
+    "div.css-146c3p1.r-dnmrzs.r-1udh08x.r-1udbk01.r-3s2u2q.r-1iln25a"
 ]
 
 USER_AGENT = (
@@ -46,7 +47,10 @@ def get_rendered_html(url: str, retries: int = 3) -> str:
         try:
             logger.info(f"Fetching URL (attempt {attempt}): {url}")
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-setuid-sandbox"],
+                    )
                 page = browser.new_page(user_agent=USER_AGENT)
                 page.goto(url, timeout=20000, wait_until="networkidle")
                 html = page.content()
@@ -139,6 +143,7 @@ def scrape_flipkart_product(url: str) -> dict:
 if __name__ == "__main__":
     test_urls = [
         "https://www.flipkart.com/vebnor-solid-men-polo-neck-light-green-t-shirt/p/itm83671e2bbcec7",
+        "https://www.flipkart.com/music-galaxy/p/itmeu2zbcryzwzcg",
         "https://www.flipkart.com/layasa-men-slippers/p/itm1a826eecef1ad",
         "https://www.invalidurl.com/product",   # should return invalid_url error
     ]
