@@ -37,4 +37,6 @@ jobs:
       - name: Run scrape job
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GMAIL_SENDER_EMAIL: ${{ secrets.GMAIL_SENDER_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python scrape_job.py

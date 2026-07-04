@@ -5,6 +5,7 @@ from datetime import datetime
 from db.connection import SessionLocal
 from db import crud
 from scraper import scrape_flipkart_product
+from email_alert import send_price_alert
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -18,16 +19,29 @@ logger = logging.getLogger(__name__)
 
 # ── Alert stub (will be replaced on Day 8) ───────────────────────────────────
 
+from email_alert import send_price_alert
+
 def send_alert_email(product, current_price: float):
     """
-    Placeholder for the real email alert (Day 8).
-    For now just logs that an alert would have fired.
+    Send a real price drop alert email via Resend.
     """
     logger.info(
-        f"[ALERT STUB] Price dropped for '{product.title}': "
-        f"₹{current_price} is at or below target ₹{product.target_price} "
-        f"→ would email {product.user_email}"
+        f"Price drop detected for '{product.title}': "
+        f"₹{current_price} ≤ target ₹{product.target_price} "
+        f"→ sending alert to {product.user_email}"
     )
+    success = send_price_alert(
+        product_title=product.title or product.url,
+        current_price=current_price,
+        target_price=product.target_price,
+        product_url=product.url,
+        recipient_email=product.user_email,
+    )
+    if not success:
+        logger.warning(
+            f"Alert email failed for product id={product.id}. "
+            f"Check RESEND_API_KEY and ALERT_TO_EMAIL in your .env"
+        )
 
 
 # ── Core job logic ────────────────────────────────────────────────────────────
