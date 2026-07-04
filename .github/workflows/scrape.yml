@@ -1,11 +1,8 @@
 name: Flipkart Price Scraper
 
 on:
-  # Run automatically every 6 hours
   schedule:
     - cron: "0 */6 * * *"
-
-  # Also allow manual trigger from GitHub Actions tab
   workflow_dispatch:
 
 jobs:
@@ -14,26 +11,21 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # Step 1: Check out your repo code onto the VM
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Install Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
 
-      # Step 3: Install all Python dependencies from requirements.txt
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Step 4: Install Playwright's Chromium browser on the VM
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
-      # Step 5: Run your scrape job
       - name: Run scrape job
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

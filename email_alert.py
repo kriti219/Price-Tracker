@@ -3,6 +3,7 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 GMAIL_SENDER_EMAIL = os.getenv("GMAIL_SENDER_EMAIL")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
-
+    
 
 # ── Email template ────────────────────────────────────────────────────────────
 
@@ -140,6 +141,24 @@ def build_alert_email_html(
     </body>
     </html>
     """
+    
+def build_alert_email_plain(
+    product_title: str,
+    current_price: float,
+    target_price: float,
+    product_url: str,
+) -> str:
+    return (
+        f"Price Drop Alert!\n\n"
+        f"Good news! A product you are tracking has dropped to your target price.\n\n"
+        f"Product: {product_title}\n"
+        f"Current Price: Rs.{current_price:,.0f}\n"
+        f"Your Target:   Rs.{target_price:,.0f}\n"
+        f"You save:      Rs.{target_price - current_price:,.0f} below your target!\n\n"
+        f"Buy now: {product_url}\n\n"
+        f"You are receiving this because you set up a price alert "
+        f"on Flipkart Price Tracker."
+    )
 
 
 # ── Send function ─────────────────────────────────────────────────────────────
@@ -175,13 +194,22 @@ def send_price_alert(
         )
         msg["From"] = f"Flipkart Price Tracker <{GMAIL_SENDER_EMAIL}>"
         msg["To"] = recipient_email
-
+        msg["Date"] = formatdate(localtime=True)           
+        msg["Message-ID"] = make_msgid(domain="gmail.com") 
+        
+        plain_body = build_alert_email_plain(
+            product_title=product_title,
+            current_price=current_price,
+            target_price=target_price,
+            product_url=product_url,
+        )
         html_body = build_alert_email_html(
             product_title=product_title,
             current_price=current_price,
             target_price=target_price,
             product_url=product_url,
         )
+        msg.attach(MIMEText(plain_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
         # Send via Gmail SMTP
