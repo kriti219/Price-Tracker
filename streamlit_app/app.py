@@ -4,12 +4,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
-from pathlib import Path
-from charts import build_price_history_chart, build_price_stats
 
-# Load .env from project root regardless of where streamlit is run from
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from api_client import (
@@ -20,8 +18,10 @@ from api_client import (
     update_target_price,
     check_api_health,
 )
+from charts import build_price_history_chart, build_price_stats
 
-load_dotenv()
+import logging
+logger = logging.getLogger(__name__)
 
 # ── Supabase client ───────────────────────────────────────────────────────────
 
@@ -45,11 +45,14 @@ st.markdown("""
 <style>
     .main-header { font-size:2.2rem; font-weight:700; color:#2874f0; margin-bottom:0; }
     .sub-header  { font-size:1rem; color:#888; margin-top:0; margin-bottom:2rem; }
-    .auth-title  { font-size:3.5rem; font-weight:700; color:#00ffcc; text-align:center; }
+    .auth-title  { font-size:1.8rem; font-weight:700; color:#2874f0; text-align:center; }
     .auth-sub    { color:#888; font-size:0.95rem; text-align:center; margin-bottom:1.5rem; }
-    .badge-instock    { background:#d4edda; color:#155724; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:600; }
-    .badge-outofstock { background:#f8d7da; color:#721c24; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:600; }
-    .badge-unknown    { background:#e2e3e5; color:#383d41; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:600; }
+    .badge-instock    { background:#d4edda; color:#155724; padding:3px 10px;
+                        border-radius:12px; font-size:0.8rem; font-weight:600; }
+    .badge-outofstock { background:#f8d7da; color:#721c24; padding:3px 10px;
+                        border-radius:12px; font-size:0.8rem; font-weight:600; }
+    .badge-unknown    { background:#e2e3e5; color:#383d41; padding:3px 10px;
+                        border-radius:12px; font-size:0.8rem; font-weight:600; }
     .price-drop  { color:#28a745; font-weight:700; }
     .price-above { color:#dc3545; font-weight:700; }
     div[data-testid="metric-container"] {
@@ -65,8 +68,6 @@ if "access_token" not in st.session_state:
     st.session_state.access_token = None
 if "user_email" not in st.session_state:
     st.session_state.user_email = None
-if "auth_mode" not in st.session_state:
-    st.session_state.auth_mode = "login"  # or "signup"
 
 # ── API health check ──────────────────────────────────────────────────────────
 
@@ -79,25 +80,34 @@ if not check_api_health():
     st.stop()
 
 
-# ── Auth screens ──────────────────────────────────────────────────────────────
+# ── Auth screen ───────────────────────────────────────────────────────────────
 
 def show_auth_screen():
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        st.markdown('<p class="auth-title">🏷️ Flipkart Price Tracker</p>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="auth-title">🏷️ Flipkart Price Tracker</p>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             '<p class="auth-sub">Track prices. Get alerted when they drop.</p>',
             unsafe_allow_html=True,
         )
 
-        # Toggle between login and signup
         tab_login, tab_signup = st.tabs(["Sign In", "Create Account"])
 
-        # ── Login tab ─────────────────────────────────────────────────────────
+        # ── Sign In ───────────────────────────────────────────────────────────
         with tab_login:
             with st.form("login_form"):
-                email = st.text_input("Email", placeholder="you@example.com")
-                password = st.text_input("Password", type="password", placeholder="••••••••")
+                email = st.text_input(
+                    "Email",
+                    placeholder="you@example.com",
+                )
+                password = st.text_input(
+                    "Password",
+                    type="password",
+                    placeholder="••••••••",
+                )
                 login_btn = st.form_submit_button(
                     "Sign In",
                     use_container_width=True,
@@ -114,7 +124,9 @@ def show_auth_screen():
                                 "email": email.strip(),
                                 "password": password,
                             })
-                            st.session_state.access_token = response.session.access_token
+                            st.session_state.access_token = (
+                                response.session.access_token
+                            )
                             st.session_state.user_email = response.user.email
                             st.success("Signed in successfully!")
                             st.rerun()
@@ -123,18 +135,24 @@ def show_auth_screen():
                             if "Invalid login credentials" in error_msg:
                                 st.error("Incorrect email or password.")
                             elif "Email not confirmed" in error_msg:
-                                st.error("Please verify your email before signing in.")
+                                st.error(
+                                    "Please verify your email "
+                                    "before signing in."
+                                )
                             else:
                                 st.error(f"Sign in failed: {error_msg}")
 
-        # ── Signup tab ────────────────────────────────────────────────────────
+        # ── Sign Up ───────────────────────────────────────────────────────────
         with tab_signup:
             with st.form("signup_form"):
-                new_email = st.text_input("Email", placeholder="you@example.com")
+                new_email = st.text_input(
+                    "Email",
+                    placeholder="you@example.com",
+                )
                 new_password = st.text_input(
                     "Password",
                     type="password",
-                    placeholder="Minimum 6 characters",
+                    placeholder="Minimum 8 characters",
                 )
                 confirm_password = st.text_input(
                     "Confirm Password",
@@ -152,7 +170,7 @@ def show_auth_screen():
                     st.error("Please fill in all fields")
                 elif "@" not in new_email:
                     st.error("Please enter a valid email address")
-                elif len(new_password) < 6:
+                elif len(new_password) < 8:
                     st.error("Password must be at least 6 characters")
                 elif new_password != confirm_password:
                     st.error("Passwords do not match")
@@ -163,29 +181,33 @@ def show_auth_screen():
                                 "email": new_email.strip(),
                                 "password": new_password,
                             })
-
                             if response.user:
-                                # If email confirmation is off, session is returned immediately
                                 if response.session:
-                                    st.session_state.access_token = response.session.access_token
-                                    st.session_state.user_email = response.user.email
-                                    st.success("Account created! Welcome aboard.")
+                                    st.session_state.access_token = (
+                                        response.session.access_token
+                                    )
+                                    st.session_state.user_email = (
+                                        response.user.email
+                                    )
+                                    st.success("Account created! Welcome.")
                                     st.rerun()
                                 else:
-                                    # Email confirmation is on
                                     st.success(
-                                        "Account created! Please check your email "
-                                        "to confirm your address, then sign in."
+                                        "Account created! Check your email "
+                                        "to confirm, then sign in."
                                     )
                         except Exception as e:
                             error_msg = str(e)
                             if "already registered" in error_msg.lower():
-                                st.error("An account with this email already exists. Please sign in.")
+                                st.error(
+                                    "An account with this email already "
+                                    "exists. Please sign in."
+                                )
                             else:
                                 st.error(f"Sign up failed: {error_msg}")
 
 
-# ── Main dashboard ────────────────────────────────────────────────────────────
+# ── Dashboard ─────────────────────────────────────────────────────────────────
 
 def show_dashboard():
     token = st.session_state.access_token
@@ -234,7 +256,9 @@ def show_dashboard():
                 st.sidebar.error("Only Flipkart URLs are supported")
             else:
                 with st.sidebar:
-                    with st.spinner("Scraping product, please wait 15-20 seconds..."):
+                    with st.spinner(
+                        "Scraping product, please wait 15-20 seconds..."
+                    ):
                         result = add_product(
                             url=product_url.strip(),
                             target_price=target_price,
@@ -243,28 +267,39 @@ def show_dashboard():
 
                 if result["status_code"] == 201:
                     st.sidebar.success(
-                        f"Now tracking: **{result['data'].get('title', 'Product')}**"
+                        f"Now tracking: "
+                        f"**{result['data'].get('title', 'Product')}**"
                     )
                     st.rerun()
                 elif result["status_code"] == 409:
-                    st.sidebar.warning("You are already tracking this product.")
+                    st.sidebar.warning(
+                        "You are already tracking this product."
+                    )
                 elif result["status_code"] == 401:
                     st.sidebar.error("Session expired. Please sign in again.")
                     st.session_state.access_token = None
                     st.rerun()
                 else:
                     st.sidebar.error(
-                        f"Failed: {result['data'].get('detail', 'Unknown error')}"
+                        f"Failed: "
+                        f"{result['data'].get('detail', 'Unknown error')}"
                     )
 
         st.sidebar.divider()
-        st.sidebar.caption("Prices auto-update every 6 hours via GitHub Actions.")
+        st.sidebar.caption(
+            "Prices auto-update every 6 hours via GitHub Actions."
+        )
 
     # ── Header ────────────────────────────────────────────────────────────────
 
-    st.markdown('<p class="main-header">🏷️ Flipkart Price Tracker</p>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="sub-header">Track product prices and get alerted when they drop</p>',
+        '<p class="main-header">🏷️ Flipkart Price Tracker</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p class="sub-header">'
+        'Track product prices and get alerted when they drop'
+        '</p>',
         unsafe_allow_html=True,
     )
 
@@ -288,7 +323,7 @@ def show_dashboard():
     with col1:
         st.metric("Total Tracked", len(active_products))
     with col2:
-        st.metric("Below Target", len(below_target))
+        st.metric("Below Target 🎉", len(below_target))
     with col3:
         st.metric("Out of Stock", len(unavailable))
     with col4:
@@ -314,7 +349,9 @@ def show_dashboard():
 
                     latest_price = product.get("latest_price")
                     target_price = product.get("target_price")
-                    availability = product.get("latest_availability", "unknown")
+                    availability = product.get(
+                        "latest_availability", "unknown"
+                    )
 
                     price_col, target_col, status_col = st.columns(3)
 
@@ -323,7 +360,8 @@ def show_dashboard():
                             is_below = latest_price <= target_price
                             css = "price-drop" if is_below else "price-above"
                             st.markdown(
-                                f'<span class="{css}">₹{latest_price:,.0f}</span>',
+                                f'<span class="{css}">'
+                                f'₹{latest_price:,.0f}</span>',
                                 unsafe_allow_html=True,
                             )
                         else:
@@ -336,42 +374,52 @@ def show_dashboard():
 
                     with status_col:
                         if availability == "in_stock":
-                            badge = '<span class="badge-instock">In Stock</span>'
+                            badge = (
+                                '<span class="badge-instock">In Stock</span>'
+                            )
                         elif availability == "out_of_stock":
-                            badge = '<span class="badge-outofstock">Out of Stock</span>'
+                            badge = (
+                                '<span class="badge-outofstock">'
+                                'Out of Stock</span>'
+                            )
                         else:
-                            badge = '<span class="badge-unknown">Unknown</span>'
+                            badge = (
+                                '<span class="badge-unknown">Unknown</span>'
+                            )
                         st.markdown(badge, unsafe_allow_html=True)
                         st.caption("Availability")
 
                 with action_col:
                     if product.get("is_active"):
-                        with st.expander("Edit"):
+                        with st.expander("✏️ Edit"):
                             new_price = st.number_input(
-                                "New target price (₹)",
+                                "New target (₹)",
                                 min_value=1.0,
                                 max_value=1000000.0,
-                                value=float(product.get("target_price", 500)),
+                                value=float(
+                                    product.get("target_price", 500)
+                                ),
                                 step=50.0,
-                                key=f"{key_prefix}price_input_{product['id']}",
-                        )
-                        if st.button(
-                            "Update",
-                            key=f"{key_prefix}update_{product['id']}",
-                            type="primary",
-                            use_container_width=True
-                        ):
-                            result = update_target_price(
-                                product_id=product["id"],
-                                new_target_price=new_price,
-                                token=token,
+                                key=f"{key_prefix}price_input_"
+                                    f"{product['id']}",
                             )
-                            if result["status_code"] == 200:
-                                st.success("Target updated!")
-                                st.rerun()
-                            else:
-                                st.error("Update failed.")
-                                
+                            if st.button(
+                                "Update",
+                                key=f"{key_prefix}update_{product['id']}",
+                                type="primary",
+                                use_container_width=True,
+                            ):
+                                result = update_target_price(
+                                    product_id=product["id"],
+                                    new_target_price=new_price,
+                                    token=token,
+                                )
+                                if result["status_code"] == 200:
+                                    st.success("Updated!")
+                                    st.rerun()
+                                else:
+                                    st.error("Update failed.")
+
                         if st.button(
                             "Stop",
                             key=f"{key_prefix}deactivate_{product['id']}",
@@ -379,125 +427,117 @@ def show_dashboard():
                             type="secondary",
                             use_container_width=True,
                         ):
-                            result = deactivate_product(product["id"], token=token)
+                            result = deactivate_product(
+                                product["id"], token=token
+                            )
                             if result["status_code"] == 200:
                                 st.success("Stopped tracking.")
                                 st.rerun()
                             else:
                                 st.error("Failed to deactivate.")
-                    
                     else:
                         st.markdown("*Inactive*")
-                        
-            # ── Price history chart expander ──────────────────────────────
-            with st.expander(
-                f"📈 View price history",
-                expanded=False,
-            ):
-                history = get_price_history(
-                    product_id=product["id"],
-                    token=token,
-                    limit=100,
-                )
 
-                if not history:
-                    st.info(
-                        "No price history yet. "
-                        "The scraper will populate this on its next run."
-                    )
-                else:
-                    # Stats row
-                    stats = build_price_stats(
-                        history,
-                        product.get("target_price", 0),
+                # ── Price history chart ───────────────────────────────────────
+                with st.expander("📈 View price history", expanded=False):
+                    history = get_price_history(
+                        product_id=product["id"],
+                        token=token,
+                        limit=100,
                     )
 
-                    if stats:
-                        s1, s2, s3, s4 = st.columns(4)
-                        with s1:
-                            st.metric(
-                                "Lowest Recorded",
-                                f"₹{stats['lowest']:,.0f}",
-                                help="Lowest price seen across all scrape runs",
-                            )
-                        with s2:
-                            st.metric(
-                                "Highest Recorded",
-                                f"₹{stats['highest']:,.0f}",
-                            )
-                        with s3:
-                            st.metric(
-                                "Average Price",
-                                f"₹{stats['average']:,.0f}",
-                            )
-                        with s4:
-                            st.metric(
-                                "Below Target",
-                                f"{stats['times_below_target']}/"
-                                f"{stats['in_stock_records']} checks",
-                                help=(
-                                    f"{stats['percentage_below_target']}% of "
-                                    f"scrape runs were at or below your target"
-                                ),
-                            )
-
-                    # Chart
-                    fig = build_price_history_chart(
-                        history=history,
-                        target_price=product.get("target_price", 0),
-                        product_title=product.get("title") or "Product",
-                    )
-
-                    if fig:
-                        st.plotly_chart(
-                            fig,
-                            use_container_width=True,
-                            key=f"{key_prefix}chart_{product['id']}",
-                            config={
-                                "displayModeBar": True,
-                                "modeBarButtonsToRemove": [
-                                    "lasso2d",
-                                    "select2d",
-                                ],
-                                "displaylogo": False,
-                            },
+                    if not history:
+                        st.info(
+                            "No price history yet. "
+                            "Data will appear after the next scrape run."
                         )
                     else:
-                        st.info(
-                            "Not enough in-stock price data to render a chart yet."
+                        stats = build_price_stats(
+                            history,
+                            product.get("target_price", 0),
                         )
 
-                    # Raw data table toggle
-                    if st.checkbox(
-                        "Show raw data",
-                        key=f"{key_prefix}raw_{product['id']}",
-                    ):
-                        import pandas as pd
-                        df = pd.DataFrame(history)
-                        df["scraped_at"] = pd.to_datetime(
-                            df["scraped_at"]
-                        ).dt.strftime("%d %b %Y %H:%M")
-                        df = df.rename(columns={
-                            "scraped_at": "Scraped At",
-                            "price": "Price (₹)",
-                            "price_raw": "Raw Price",
-                            "availability": "Availability",
-                        })
-                        st.dataframe(
-                            df[["Scraped At", "Price (₹)", "Raw Price", "Availability"]],
-                            use_container_width=True,
-                            hide_index=True,
+                        if stats:
+                            s1, s2, s3, s4 = st.columns(4)
+                            with s1:
+                                st.metric(
+                                    "Lowest",
+                                    f"₹{stats['lowest']:,.0f}",
+                                )
+                            with s2:
+                                st.metric(
+                                    "Highest",
+                                    f"₹{stats['highest']:,.0f}",
+                                )
+                            with s3:
+                                st.metric(
+                                    "Average",
+                                    f"₹{stats['average']:,.0f}",
+                                )
+                            with s4:
+                                st.metric(
+                                    "Below Target",
+                                    f"{stats['times_below_target']}/"
+                                    f"{stats['in_stock_records']} checks",
+                                )
+
+                        fig = build_price_history_chart(
+                            history=history,
+                            target_price=product.get("target_price", 0),
+                            product_title=product.get("title") or "Product",
                         )
 
-            st.divider()
+                        if fig:
+                            st.plotly_chart(
+                                fig,
+                                use_container_width=True,
+                                key=f"{key_prefix}chart_{product['id']}",
+                                config={
+                                    "displayModeBar": True,
+                                    "modeBarButtonsToRemove": [
+                                        "lasso2d", "select2d"
+                                    ],
+                                    "displaylogo": False,
+                                },
+                            )
+                        else:
+                            st.info(
+                                "Not enough data to render chart yet."
+                            )
 
-                
+                        if st.checkbox(
+                            "Show raw data",
+                            key=f"{key_prefix}raw_{product['id']}",
+                        ):
+                            import pandas as pd
+                            df = pd.DataFrame(history)
+                            df["scraped_at"] = pd.to_datetime(
+                                df["scraped_at"]
+                            ).dt.strftime("%d %b %Y %H:%M")
+                            df = df.rename(columns={
+                                "scraped_at": "Scraped At",
+                                "price": "Price (₹)",
+                                "price_raw": "Raw Price",
+                                "availability": "Availability",
+                            })
+                            st.dataframe(
+                                df[[
+                                    "Scraped At", "Price (₹)",
+                                    "Raw Price", "Availability"
+                                ]],
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+
+                st.divider()
+
+    # ── Tabs ──────────────────────────────────────────────────────────────────
 
     if not products:
         st.info(
             "You are not tracking any products yet. "
             "Use the sidebar to add your first product.",
-            icon="⬅",
+            icon="👈",
         )
     else:
         tab_active, tab_all = st.tabs([
@@ -508,6 +548,8 @@ def show_dashboard():
             render_product_table(active_products, key_prefix="active_")
         with tab_all:
             render_product_table(products, key_prefix="all_")
+
+    # ── Refresh button ────────────────────────────────────────────────────────
 
     col_left, col_right = st.columns([5, 1])
     with col_right:
