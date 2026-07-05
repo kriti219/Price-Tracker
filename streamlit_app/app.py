@@ -7,6 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client
 from pathlib import Path
+from charts import build_price_history_chart, build_price_stats
 
 # Load .env from project root regardless of where streamlit is run from
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -14,6 +15,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 from api_client import (
     add_product,
     get_all_products,
+    get_price_history,
     deactivate_product,
     update_target_price,
     check_api_health,
@@ -386,8 +388,109 @@ def show_dashboard():
                     
                     else:
                         st.markdown("*Inactive*")
+                        
+            # ── Price history chart expander ──────────────────────────────
+            with st.expander(
+                f"📈 View price history",
+                expanded=False,
+            ):
+                history = get_price_history(
+                    product_id=product["id"],
+                    token=token,
+                    limit=100,
+                )
 
-                st.divider()
+                if not history:
+                    st.info(
+                        "No price history yet. "
+                        "The scraper will populate this on its next run."
+                    )
+                else:
+                    # Stats row
+                    stats = build_price_stats(
+                        history,
+                        product.get("target_price", 0),
+                    )
+
+                    if stats:
+                        s1, s2, s3, s4 = st.columns(4)
+                        with s1:
+                            st.metric(
+                                "Lowest Recorded",
+                                f"₹{stats['lowest']:,.0f}",
+                                help="Lowest price seen across all scrape runs",
+                            )
+                        with s2:
+                            st.metric(
+                                "Highest Recorded",
+                                f"₹{stats['highest']:,.0f}",
+                            )
+                        with s3:
+                            st.metric(
+                                "Average Price",
+                                f"₹{stats['average']:,.0f}",
+                            )
+                        with s4:
+                            st.metric(
+                                "Below Target",
+                                f"{stats['times_below_target']}/"
+                                f"{stats['in_stock_records']} checks",
+                                help=(
+                                    f"{stats['percentage_below_target']}% of "
+                                    f"scrape runs were at or below your target"
+                                ),
+                            )
+
+                    # Chart
+                    fig = build_price_history_chart(
+                        history=history,
+                        target_price=product.get("target_price", 0),
+                        product_title=product.get("title") or "Product",
+                    )
+
+                    if fig:
+                        st.plotly_chart(
+                            fig,
+                            use_container_width=True,
+                            config={
+                                "displayModeBar": True,
+                                "modeBarButtonsToRemove": [
+                                    "lasso2d",
+                                    "select2d",
+                                ],
+                                "displaylogo": False,
+                            },
+                        )
+                    else:
+                        st.info(
+                            "Not enough in-stock price data to render a chart yet."
+                        )
+
+                    # Raw data table toggle
+                    if st.checkbox(
+                        "Show raw data",
+                        key=f"{key_prefix}raw_{product['id']}",
+                    ):
+                        import pandas as pd
+                        df = pd.DataFrame(history)
+                        df["scraped_at"] = pd.to_datetime(
+                            df["scraped_at"]
+                        ).dt.strftime("%d %b %Y %H:%M")
+                        df = df.rename(columns={
+                            "scraped_at": "Scraped At",
+                            "price": "Price (₹)",
+                            "price_raw": "Raw Price",
+                            "availability": "Availability",
+                        })
+                        st.dataframe(
+                            df[["Scraped At", "Price (₹)", "Raw Price", "Availability"]],
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+            st.divider()
+
+                
 
     if not products:
         st.info(
