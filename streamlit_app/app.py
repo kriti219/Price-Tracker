@@ -26,10 +26,13 @@ logger = logging.getLogger(__name__)
 
 # ── Supabase client ───────────────────────────────────────────────────────────
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_ANON_KEY"),
-)
+supabase_url = os.getenv("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_ANON_KEY") or st.secrets.get("SUPABASE_ANON_KEY")
+
+if not supabase_url or not supabase_key:
+    st.error("Missing Supabase credentials. Please set them in your Streamlit Secrets.")
+
+supabase = create_client(supabase_url, supabase_key)
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
@@ -45,7 +48,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main-header { font-size:2.2rem; font-weight:700; color:#2874f0; margin-bottom:0; }
+    .main-header { font-size:2.2rem; font-weight:700; color:#f0f8ff; margin-bottom:0; }
     .sub-header  { font-size:1rem; color:#888; margin-top:0; margin-bottom:2rem; }
     .auth-title  { font-size:1.8rem; font-weight:700; color:#f0f8ff; text-align:center; }
     .auth-sub    { color:#888; font-size:0.95rem; text-align:center; margin-bottom:1.5rem; }
@@ -61,11 +64,7 @@ st.markdown("""
         background:#f8f9fa; border:1px solid #e0e0e0;
         border-radius:8px; padding:16px;
         
-    @media (max-width: 640px) {
-        [data-testid="column"] {
-            min-width: 100% !important;
-            flex: 1 1 100% !important;
-        }
+    
     }
 </style>
 """, unsafe_allow_html=True)
@@ -79,16 +78,13 @@ if "user_email" not in st.session_state:
 
 # ── API health check ──────────────────────────────────────────────────────────
 
-with st.spinner("Connecting to backend, please wait..."):
-    api_ok = check_api_health()
-
-if not api_ok:
+if not check_api_health():
     st.error(
-        "Cannot connect to the backend API. "
-        "It may be waking up from sleep. Please refresh the page in 30 seconds.",
-        icon="🔴",
+        "Cannot connect to the FastAPI backend. "
+        "Run: `uvicorn main:app --reload`",
     )
     st.stop()
+
 
 # ── Auth screen ───────────────────────────────────────────────────────────────
 
