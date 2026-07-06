@@ -1,11 +1,18 @@
 import sys
 import os
 
-# Add project root to path (for db/, auth/ modules)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ── Path setup ────────────────────────────────────────────────────────────────
+# Streamlit Cloud runs from repo root, so we need to explicitly add
+# both the repo root and the streamlit_app directory to sys.path
 
-# Add streamlit_app/ to path (for api_client.py and charts.py)
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_root_dir = os.path.dirname(_current_dir)
+
+# Add both directories at position 0 (highest priority)
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
+if _root_dir not in sys.path:
+    sys.path.insert(0, _root_dir)
 
 import streamlit as st
 from datetime import datetime
