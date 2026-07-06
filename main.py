@@ -129,6 +129,10 @@ def add_product(
         price_raw=scraped.get("price_raw"),
         availability=scraped.get("availability", "unknown"),
     )
+    
+    logger.info(
+        f"Product added: id={product.id}, title={product.title}"
+    )
 
     return product
 
