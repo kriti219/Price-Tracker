@@ -4,19 +4,53 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 TIMEOUT = 60
 
 
+def get_api_base_url() -> str:
+    """
+    Read API_BASE_URL at call time, not import time.
+    Tries st.secrets first, falls back to environment variable,
+    then falls back to localhost for local development.
+    """
+    try:
+        import streamlit as st
+        return st.secrets.get("API_BASE_URL", os.getenv("API_BASE_URL", "http://127.0.0.1:8000"))
+    except Exception:
+        return os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+
+
 def _auth_headers(token: str) -> dict:
-    """Build authorization header from JWT token."""
     return {"Authorization": f"Bearer {token}"}
 
 
+def check_api_health() -> bool:
+    """
+    Returns True if FastAPI is reachable.
+    Uses a longer timeout and retries once to handle
+    Render free tier cold starts (30-60 seconds).
+    """
+    api_url = get_api_base_url()
+    for attempt in range(2):  # try twice
+        try:
+            response = requests.get(
+                f"{api_url}/",
+                timeout=30,  # increased from 5 to 30
+            )
+            if response.status_code == 200:
+                return True
+        except Exception:
+            if attempt == 0:
+                import time
+                time.sleep(5)  # wait 5 seconds before retry
+    return False
+
+
 def add_product(url: str, target_price: float, token: str) -> dict:
+    api_url = get_api_base_url()
     try:
         response = requests.post(
-            f"{API_BASE_URL}/products",
+            f"{api_url}/products",
             json={"url": url, "target_price": target_price},
             headers=_auth_headers(token),
             timeout=TIMEOUT,
@@ -29,9 +63,10 @@ def add_product(url: str, target_price: float, token: str) -> dict:
 
 
 def get_all_products(token: str) -> list:
+    api_url = get_api_base_url()
     try:
         response = requests.get(
-            f"{API_BASE_URL}/products",
+            f"{api_url}/products",
             headers=_auth_headers(token),
             timeout=TIMEOUT,
         )
@@ -41,9 +76,10 @@ def get_all_products(token: str) -> list:
 
 
 def get_price_history(product_id: int, token: str, limit: int = 50) -> list:
+    api_url = get_api_base_url()
     try:
         response = requests.get(
-            f"{API_BASE_URL}/products/{product_id}/history",
+            f"{api_url}/products/{product_id}/history",
             headers=_auth_headers(token),
             params={"limit": limit},
             timeout=TIMEOUT,
@@ -54,9 +90,10 @@ def get_price_history(product_id: int, token: str, limit: int = 50) -> list:
 
 
 def deactivate_product(product_id: int, token: str) -> dict:
+    api_url = get_api_base_url()
     try:
         response = requests.delete(
-            f"{API_BASE_URL}/products/{product_id}",
+            f"{api_url}/products/{product_id}",
             headers=_auth_headers(token),
             timeout=TIMEOUT,
         )
@@ -67,21 +104,15 @@ def deactivate_product(product_id: int, token: str) -> dict:
         return {"status_code": 500, "data": {"detail": str(e)}}
 
 
-def check_api_health() -> bool:
-    try:
-        response = requests.get(f"{API_BASE_URL}/", timeout=5)
-        return response.status_code == 200
-    except Exception:
-        return False
-    
 def update_target_price(
     product_id: int,
     new_target_price: float,
     token: str,
 ) -> dict:
+    api_url = get_api_base_url()
     try:
         response = requests.patch(
-            f"{API_BASE_URL}/products/{product_id}/target",
+            f"{api_url}/products/{product_id}/target",
             json={"target_price": new_target_price},
             headers=_auth_headers(token),
             timeout=TIMEOUT,

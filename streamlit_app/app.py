@@ -79,14 +79,16 @@ if "user_email" not in st.session_state:
 
 # ── API health check ──────────────────────────────────────────────────────────
 
-if not check_api_health():
+with st.spinner("Connecting to backend, please wait..."):
+    api_ok = check_api_health()
+
+if not api_ok:
     st.error(
-        "Cannot connect to the FastAPI backend. "
-        "Run: `uvicorn main:app --reload`",
+        "Cannot connect to the backend API. "
+        "It may be waking up from sleep. Please refresh the page in 30 seconds.",
         icon="🔴",
     )
     st.stop()
-
 
 # ── Auth screen ───────────────────────────────────────────────────────────────
 
