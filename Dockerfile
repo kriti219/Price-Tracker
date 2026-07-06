@@ -1,5 +1,5 @@
-# Use the official Microsoft Playwright image that includes Python and browser binaries
-FROM mcr.microsoft.com/playwright/python:v1.45.0-noble
+# Change v1.45.0-noble to v1.45.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
 
 WORKDIR /app
 
