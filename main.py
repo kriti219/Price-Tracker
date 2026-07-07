@@ -249,9 +249,3 @@ def update_target_price(
     return updated
 
 
-if __name__ == "__main__":
-    import uvicorn
-    # Dynamically read the PORT variable injected by Railway
-    port = int(os.environ.get("PORT", 8000))
-    # Run the server bound to 0.0.0.0 so external networks can route inside
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
